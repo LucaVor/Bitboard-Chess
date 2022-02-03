@@ -303,6 +303,7 @@ namespace QuickChess
         public EnemyAttackingReturnData GetAllAttackedSquaresExcludingKing (int colour, UInt64 friend, UInt64 enemy, Pieces[] friendlyPieces, int targetKing)
         {
             UInt64 allAttacked = 0UL;
+            TARGET_KING_SQUARE = targetKing;    
 
             UInt64 whiteBinary = board.white.GetCombinedBinary();
             UInt64 blackBinary = board.black.GetCombinedBinary();
