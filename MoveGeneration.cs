@@ -452,6 +452,8 @@ namespace QuickChess
         public UInt64 GetKnightMoves(int square, UInt64 friend, UInt64 enemy, int useKingMask = INCLUDE_KING)
         {
             UInt64 moves = PreProcessing.precomputedKnightAttacks[square];
+            if (useKingMask == EXCLUDE_KING) return moves;
+            
             moves &= ~friend;
 
             attackedSquares |= moves;
