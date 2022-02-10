@@ -68,6 +68,19 @@ ______________
 
 namespace QuickChess
 {
+    public class Move
+    {
+        public int from;
+        public int to;
+
+        public int pieceType;
+        public int pieceCapturing;
+
+        public bool isCapture;
+
+        public static int[] PieceValues = new int[] { 1, 5, 3, 3, 9, 0 };
+    }
+
     public class MoveGeneration
     {
         public Board board;
@@ -76,6 +89,9 @@ namespace QuickChess
         public UInt64 possibleAttackedSquares;
         public UInt64 amalgamatedMoves = 0;
         public UInt64 attackMoves = 0;
+        public UInt64 pawnAttackedMoves;
+
+        public int[] pieceMap;
 
         public const int EXCLUDE_KING = 0;
         public const int INCLUDE_KING = 1;
@@ -96,10 +112,12 @@ namespace QuickChess
         public UInt64[] GenerateMoves(bool psuedo = false)
         {
             moves = new UInt64[64];
+            pieceMap = new int[64];
             attackedSquares = 0;
             possibleAttackedSquares = 0;
             amalgamatedMoves = 0;
             attackMoves = 0;
+            pawnAttackedMoves = 0;
 
             UInt64 whiteBinary = board.white.GetCombinedBinary();
             UInt64 blackBinary = board.black.GetCombinedBinary();
@@ -137,6 +155,7 @@ namespace QuickChess
             // TODO: Make it only generate king moves if there is more than one checker
 
             inCheck = (enemyAttackedSquares & (1UL << friendlyKingSquare)) != 0;
+            board.inCheck = inCheck;
 
             for (int pc = 0; pc < 6; pc ++)
             {
@@ -155,12 +174,16 @@ namespace QuickChess
                                 move, PreProcessing.KING, inCheck, checkers, i, friendlyKingSquare, enemyAttackedSquares, blockers, enemyRooks, enemyBishops, enemyQueens
                             );
 
+                            pieceMap[i] = PreProcessing.KING;
+
                             break;
                         case 1:                              
                             move = GetQueenMoves (i, friendly, enemy);
                             move = MakeLegal (
                                 move, PreProcessing.QUEEN, inCheck, checkers, i, friendlyKingSquare, enemyAttackedSquares, blockers, enemyRooks, enemyBishops, enemyQueens
                             );
+
+                            pieceMap[i] = PreProcessing.QUEEN;
                             
                             break;
                         case 2:                              
@@ -168,6 +191,8 @@ namespace QuickChess
                             move = MakeLegal (
                                 move, PreProcessing.ROOK, inCheck, checkers, i, friendlyKingSquare, enemyAttackedSquares, blockers, enemyRooks, enemyBishops, enemyQueens
                             );
+
+                            pieceMap[i] = PreProcessing.ROOK;
                             
                             break;
                         case 3:                              
@@ -175,6 +200,8 @@ namespace QuickChess
                             move = MakeLegal (
                                 move, PreProcessing.BISHOP, inCheck, checkers, i, friendlyKingSquare, enemyAttackedSquares, blockers, enemyRooks, enemyBishops, enemyQueens
                             );
+
+                            pieceMap[i] = PreProcessing.BISHOP;
                             
                             break;
                         case 4:                              
@@ -182,6 +209,8 @@ namespace QuickChess
                             move = MakeLegal (
                                 move, PreProcessing.KNIGHT, inCheck, checkers, i, friendlyKingSquare, enemyAttackedSquares, blockers, enemyRooks, enemyBishops, enemyQueens
                             );
+
+                            pieceMap[i] = PreProcessing.KNIGHT;
                             
                             break;
                         case 5:
@@ -189,6 +218,8 @@ namespace QuickChess
                             move = MakeLegal (
                                 move, PreProcessing.PAWN, inCheck, checkers, i, friendlyKingSquare, enemyAttackedSquares, blockers, enemyRooks, enemyBishops, enemyQueens
                             );
+
+                            pieceMap[i] = PreProcessing.PAWN;
                             
                             break;
                     }
@@ -210,9 +241,53 @@ namespace QuickChess
                 // Checkmate
                 board.inCheckmate = true;
                 board.onCheckmateCallback ();
+            } else {
+                board.inCheckmate = false;
             }
 
             return moves;
+        }
+
+        private List<Move> formattedMoves;
+
+        public List<Move> FormatLegalMoves ()
+        {
+            UInt64 whiteBinary = board.white.GetCombinedBinary();
+            UInt64 blackBinary = board.black.GetCombinedBinary();
+
+            UInt64 friend = board.whiteMove ? whiteBinary : blackBinary;
+            UInt64 enemy = board.whiteMove ? blackBinary : whiteBinary;
+
+            formattedMoves = new List<Move> ();
+
+            while (friend != 0)
+            {
+                int from = _ForwardBitScan (friend);
+
+                UInt64 allMoves = moves[from];
+
+                while (allMoves != 0)
+                {
+                    int to = _ForwardBitScan (allMoves);
+
+                    Move currentMove = new Move ();
+
+                    currentMove.from = from;
+                    currentMove.to = to;
+
+                    currentMove.isCapture = ((enemy & (1UL << to)) != 0);
+                    currentMove.pieceType = pieceMap[from];
+                    currentMove.pieceCapturing = pieceMap[to];
+
+                    formattedMoves.Add (currentMove);
+
+                    allMoves &= allMoves - 1;
+                }
+
+                friend &= friend - 1;
+            }
+
+            return formattedMoves;
         }
 
         public UInt64 MakeLegal (UInt64 moves, int pieceType, bool inCheck, int[] checkers, int square, int kingSquare, UInt64 enemyAttacked, UInt64 blockers, UInt64 enemyRooks, UInt64 enemyBishops, UInt64 enemyQueens)
@@ -254,14 +329,17 @@ namespace QuickChess
                         UInt64 pieceToRQ = PreProcessing.squaresBetween[square,pinnerIndex];
                         pinnedFile |= pieceToRQ;
 
-                        if ((pieceToRQ & blockers) == 0) {
+                        UInt64 KingToRQ = PreProcessing.squaresBetween[kingSquare,square];
+                        pinnedFile |= KingToRQ;
+
+                        if ((pieceToRQ & blockers) == 0 && (KingToRQ & blockers) == 0) {
                             isPinned = true;
                         }
                     }
                 }
 
                 if (PreProcessing.Diagonals[(int)dir] == 1) {
-                    UInt64 spotBishopMask = spots & (enemyRooks | enemyQueens);
+                    UInt64 spotBishopMask = spots & (enemyBishops | enemyQueens);
 
                     if (spotBishopMask != 0) {
                         int pinnerIndex = 0;
@@ -278,7 +356,10 @@ namespace QuickChess
                         UInt64 pieceToBQ = PreProcessing.squaresBetween[square,pinnerIndex];
                         pinnedFile |= pieceToBQ;
 
-                        if ((pieceToBQ & blockers) == 0) {
+                        UInt64 KingToBQ = PreProcessing.squaresBetween[kingSquare,square];
+                        pinnedFile |= KingToBQ;
+
+                        if ((pieceToBQ & blockers) == 0 && (KingToBQ & blockers) == 0) {
                             isPinned = true;
                         }
                     }
@@ -392,17 +473,20 @@ namespace QuickChess
             {
                 int kingSide = colour == PieceBinary.White ? Board.WhiteKingCastling : Board.BlackKingCastling;
                 int queenSide = colour == PieceBinary.White ? Board.WhiteQueenCastling : Board.BlackQueenCastling;
+                int kingSideRook = colour == PieceBinary.White ? PreProcessing.whiteKingSideRook : PreProcessing.blackKingSideRook;
+                int queenSideRook = colour == PieceBinary.White ? PreProcessing.whiteQueenSideRook : PreProcessing.blackQueenSideRook;
+                UInt64 friendlyRooks = colour == PieceBinary.White ? board.white.Rooks.bitmap : board.black.Rooks.bitmap;
                 UInt64 kingSidePieceMask = colour == PieceBinary.White ? PreProcessing.whiteKingSidePieceCheckingMask : PreProcessing.blackKingSidePieceCheckingMask;
                 UInt64 queenSidePieceMask = colour == PieceBinary.White ? PreProcessing.whiteQueenSidePieceCheckingMask : PreProcessing.blackQueenSidePieceCheckingMask;
 
                 if (
-                    (board.castlingRights & kingSide) == 0 || (blockers & kingSidePieceMask) != 0
+                    (board.castlingRights & kingSide) == 0 || (blockers & kingSidePieceMask) != 0 || (friendlyRooks & (1UL << kingSideRook)) == 0
                 ) {
                     castlingMoves &= ~PreProcessing.kingSideMask;
                 }
 
                 if (
-                    (board.castlingRights & queenSide) == 0 || (blockers & queenSidePieceMask) != 0
+                    (board.castlingRights & queenSide) == 0 || (blockers & queenSidePieceMask) != 0 || (friendlyRooks & (1UL << queenSideRook)) == 0
                 ) {
                     castlingMoves &= ~PreProcessing.queenSideMask;
                 }
@@ -432,7 +516,10 @@ namespace QuickChess
             UInt64 moves = (colour == PieceBinary.White) ? PreProcessing.precomputedWhitePawnMoves[square] : PreProcessing.precomputedBlackPawnMoves[square];
             UInt64 attacks = (colour == PieceBinary.White) ? PreProcessing.precomputedWhitePawnAttacks[square] : PreProcessing.precomputedBlackPawnAttacks[square];
             
-            if (useKingMask == EXCLUDE_KING) return attacks;
+            if (useKingMask == EXCLUDE_KING) {
+                pawnAttackedMoves |= attacks;
+                return attacks;
+            }
 
             possibleAttackedSquares |= attacks;
             

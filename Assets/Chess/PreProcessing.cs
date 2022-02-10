@@ -37,6 +37,10 @@ namespace QuickChess
         public const int whiteQueenSideCastle = 2;
         public const int blackKingSideCastle = 62;
         public const int blackQueenSideCastle = 58;
+        public const int whiteKingSideRook = 7;
+        public const int whiteQueenSideRook = 0;
+        public const int blackKingSideRook = 63;
+        public const int blackQueenSideRook = 56;
 
         public const int PAWN = 0;
         public const int ROOK = 1;

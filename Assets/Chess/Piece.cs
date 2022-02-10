@@ -23,6 +23,10 @@ namespace QuickChess
 
         public void AddPieceAt (int square)
         {
+            if (pieces >= currentPieces.Length)
+            {
+                UnityEngine.Debug.Log ("There is an error when adding pieces.");
+            }
             currentPieces[pieces] = square;
             squareToPieces[square] = pieces;
             bitmap |= One << square;
@@ -46,9 +50,9 @@ namespace QuickChess
     {
         public Pieces King = new Pieces (1);
         public Pieces Queens = new Pieces (9);
-        public Pieces Rooks = new Pieces (10);
-        public Pieces Bishops = new Pieces (10);
-        public Pieces Knights = new Pieces (10);
+        public Pieces Rooks = new Pieces (2);
+        public Pieces Bishops = new Pieces (2);
+        public Pieces Knights = new Pieces (2);
         public Pieces Pawns = new Pieces (8);
 
         public static string[] names = {

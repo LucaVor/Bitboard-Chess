@@ -73,7 +73,19 @@ namespace QuickChess
         public UnityEngine.AudioClip gameStart;
         public UnityEngine.AudioClip ashersMusic;
 
+        public Evaluate Evaluator;
+        public UnityEngine.UI.Text evaluationText;
+
         public string fen = "8/4PKb1/8/4pk2/8/8/8/8";
+        public bool setCastlingRights;
+        public bool canWhiteCastle;
+        public bool canWhiteCastleKing;
+        public bool canWhiteCastleQueen;
+        public bool canBlackCastle;
+        public bool canBlackCastleKing;
+        public bool canBlackCastleQueen;
+        public bool startOnWhiteMove = true;
+        public bool useAI = true;
 
         void Awake()
         {
@@ -102,9 +114,49 @@ namespace QuickChess
             DebugC.Init();
 
             board = new Board(fen);
+            board.whiteMove = startOnWhiteMove;
+
+            if (setCastlingRights)
+            {
+                int castlingRights = 0;
+
+                if (canWhiteCastle)
+                {
+                    castlingRights |= Board.WhiteCastling;
+                } if (canWhiteCastleKing)
+                {
+                    castlingRights |= Board.WhiteKingCastling;
+                } if (canWhiteCastleQueen)
+                {
+                    castlingRights |= Board.WhiteQueenCastling;
+                } if (canBlackCastle)
+                {
+                    castlingRights |= Board.BlackCastling;
+                } if (canBlackCastleKing)
+                {
+                    castlingRights |= Board.BlackKingCastling;
+                } if (canBlackCastleQueen)
+                {
+                    castlingRights |= Board.BlackQueenCastling;
+                }
+
+                board.castlingRights = castlingRights;
+            }
+
+            board.RegenerateLegalMoves ();
+
+            if (!startOnWhiteMove && useAI)
+            {
+                Ai.ai.Start ();
+                Ai.ai.AI ();
+            }
+
             board.onCastleCallback = OnCastle;
             board.onPromotionCallback = OnPromotion;
             board.onCheckmateCallback = OnCheckmate;
+
+            Evaluator = new Evaluate();
+            evaluationText.text = Evaluator.Eval (board).ToString ();
 
             Debug.Log ("Playing as white: " + whiteMove);
 
@@ -151,7 +203,7 @@ namespace QuickChess
                     true
                 );
 
-                if (!whitePlayer)
+                if (!whitePlayer && useAI)
                 {
                     Ai.ai.AI();
                 }
@@ -276,10 +328,10 @@ namespace QuickChess
                 UInt64 whiteBinary = board.white.GetCombinedBinary();
                 UInt64 blackBinary = board.black.GetCombinedBinary();
                 
-                if ((whiteBinary & (1UL << from)) != 0 && !whitePlayer)
+                if ((whiteBinary & (1UL << from)) != 0 && !whitePlayer && !fromAi)
                 {
                     return;
-                } if ((blackBinary & (1UL << from)) != 0 && whitePlayer)
+                } if ((blackBinary & (1UL << from)) != 0 && whitePlayer && !fromAi)
                 {
                     return;
                 }
@@ -290,9 +342,11 @@ namespace QuickChess
             GamePiece pieceToMove = pieceMap[f];
             bool isCaptureMove = pieceMap[t] != null;
             bool isLegal = board.Push (f, t);
+            board.RegenerateLegalMoves ();
 
             if (!isLegal)
             {
+                if (fromAi) Debug.Log  ($"Ai made illegal move: {board.latestError}");
                 GameManager.Play (SoundEffects.Illegal);
                 return;
             }
@@ -315,8 +369,12 @@ namespace QuickChess
             else
                 GameManager.Play (SoundEffects.Check);
 
-            if (!multiplayer && !fromAi)
+            if (!multiplayer && !fromAi && useAI) {
+                Debug.Log ("Ai! Your turn.");
                 Ai.ai.AI();
+            }
+
+            evaluationText.text = Evaluator.Eval (board).ToString();
         }
 
         public void OnCheckmate()
@@ -329,7 +387,7 @@ namespace QuickChess
         {
             // Initialize pieces
             pieces = new GamePiece[32];
-            pieceMap = new GamePiece[64];
+            pieceMap = new GamePiece[64]; /*  */
             for (int i = 0; i < 64; i ++) pieceMap[i] = null;
 
             int currentPiece = 0;

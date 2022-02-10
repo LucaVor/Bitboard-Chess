@@ -32,6 +32,7 @@ namespace QuickChess
         private string numbers = "0123456789";
 
         public bool inCheckmate = false;
+        public bool inCheck = false;
 
         public Board(string _fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
         {
@@ -153,7 +154,8 @@ namespace QuickChess
                 wasCapturingMove = false;
             }
 
-            bool wasKingMove = pieceType == white.King || pieceType == black.King;
+            bool wasWhiteKingMove = (white.King.bitmap & (1UL << from)) != 0;
+            bool wasBlackKingMove = (black.King.bitmap & (1UL << from)) != 0;
 
             pieceType.RemovePieceAt (from);
             pieceType.AddPieceAt (to);
@@ -161,7 +163,7 @@ namespace QuickChess
             bool thisWasC = false;
 
             #region HandleCastling (Rights & Moves)
-            if (from == PreProcessing.whiteKingSquare && (castlingRights & WhiteCastling) != 0 && wasKingMove)
+            if (from == PreProcessing.whiteKingSquare && (castlingRights & WhiteCastling) != 0 && wasWhiteKingMove)
             {
                 if (to == PreProcessing.whiteKingSideCastle)
                 { // White king side castle
@@ -184,7 +186,7 @@ namespace QuickChess
                 }
 
                 castlingRights -= WhiteCastling;
-            } if (from == PreProcessing.blackKingSquare && (castlingRights & BlackCastling) != 0 && wasKingMove)
+            } if (from == PreProcessing.blackKingSquare && (castlingRights & BlackCastling) != 0 && wasBlackKingMove)
             {
                 if (to == PreProcessing.blackKingSideCastle)
                 { // Black king side castle
