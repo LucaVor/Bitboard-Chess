@@ -20,8 +20,10 @@ namespace QuickChess
         public Evaluate evaluator;
 
         public bool white;
+        public bool useOpeningBook;
         public int nodesEvaluated = 0;
         public int checkmatesFound = 0;
+        public int nodesCutoff = 0;
 
         public System.Diagnostics.Stopwatch stopwatch;
         public UnityEngine.UI.Text moveCountText;
@@ -35,6 +37,8 @@ namespace QuickChess
         {
             gm = GameManager.instance;
             evaluator = new Evaluate ();
+
+            // Depth = SceneManagement.DEPTH;
         }
 
         public bool IsMateScore (float score)
@@ -65,7 +69,7 @@ namespace QuickChess
 
             if (depth == 0)
             {
-                float eval = Quiesce (0, alpha, beta);
+                float eval = ((SceneManagement.boolQuiesence) ? (Quiesce (0, alpha, beta)) : (evaluator.Eval (board)));
                 // float eval = evaluator.Eval (board);
 
                 return eval;
@@ -87,7 +91,7 @@ namespace QuickChess
 
             UInt64[] legalMoves = board.legalMoves;
             List<Move> formattedMoves = board.moveGenerator.FormatLegalMoves ();
-            MoveOrdering.OrderMoves (board, formattedMoves, depth == Depth);
+            MoveOrdering.OrderMoves (board, formattedMoves);
 
             int castlingRights = board.castlingRights;
             bool whiteMove = board.whiteMove;
@@ -148,6 +152,7 @@ namespace QuickChess
 
                 if (eval >= beta)
                 {
+                    nodesCutoff ++;
                     return beta;
                 }
 
@@ -202,6 +207,8 @@ namespace QuickChess
             // }
 
             UInt64[] legalMoves = board.moveGenerator.GenerateMoves ();
+            List<Move> allMoves = board.moveGenerator.FormatLegalMoves (true);
+            MoveOrdering.OrderMoves (board, allMoves, true);
 
             UInt64 friendlyCharacters = board.whiteMove ? board.white.GetCombinedBinary() : board.black.GetCombinedBinary();
             UInt64 enemyCharacters = board.whiteMove ? board.black.GetCombinedBinary() : board.white.GetCombinedBinary ();
@@ -209,74 +216,61 @@ namespace QuickChess
             int castlingRights = board.castlingRights;
             bool whiteMove = board.whiteMove;
 
-            while (friendlyCharacters != 0)
+            foreach (Move move in allMoves)
             {
-                int from = _ForwardBitScan (friendlyCharacters);
+                int to = move.to;
+                int from = move.from;
 
-                UInt64 moves = legalMoves[from];
+                // Move board
+                bool errorCode = board.Push (from, to);
 
-                // Exclude all moves that aren't capturing enemy pieces (aka. Captures)
-                moves &= enemyCharacters;
+                #region Save Data
+                bool wasCapturing = board.wasCapturingMove;
+                bool wasCastling = board.wasCastlingMove;
+                bool wasPromotion = board.wasPromotion;
+                bool wasCheck = board.inCheck;
+                bool wasCheckmate = board.inCheckmate;
 
-                while (moves != 0)
+                Pieces pawnsPromotedFrom = board.pawnsPromotedFrom;
+                Pieces queensPromotedTo = board.queensPromotedTo;
+                Pieces pieceCaptured = board.latestPieceCaptured;
+                Pieces rooksCastled = board.rooksCastled;
+                int rookCastleSquare = board.latestRookCastleSqr;
+                int rookCastleSquareFrom = board.latestRookCastleSqrFrom;
+                #endregion
+
+                float score = -Quiesce (depth - 1, -beta, -alpha);
+
+                board.inCheck = wasCheck;
+                board.inCheckmate = wasCheckmate;
+
+                #region Undo Move
+                if (!wasPromotion)
+                    board.ForcePush (to, from);
+
+                if (wasCapturing)
                 {
-                    int to = _ForwardBitScan (moves);
-
-                    // Move board
-                    bool errorCode = board.Push (from, to);
-
-                    #region Save Data
-                    bool wasCapturing = board.wasCapturingMove;
-                    bool wasCastling = board.wasCastlingMove;
-                    bool wasPromotion = board.wasPromotion;
-                    bool wasCheck = board.inCheck;
-                    bool wasCheckmate = board.inCheckmate;
-
-                    Pieces pawnsPromotedFrom = board.pawnsPromotedFrom;
-                    Pieces queensPromotedTo = board.queensPromotedTo;
-                    Pieces pieceCaptured = board.latestPieceCaptured;
-                    Pieces rooksCastled = board.rooksCastled;
-                    int rookCastleSquare = board.latestRookCastleSqr;
-                    int rookCastleSquareFrom = board.latestRookCastleSqrFrom;
-                    #endregion
-
-                    float score = -Quiesce (depth - 1, -beta, -alpha);
-
-                    board.inCheck = wasCheck;
-                    board.inCheckmate = wasCheckmate;
-
-                    #region Undo Move
-                    if (!wasPromotion)
-                        board.ForcePush (to, from);
-
-                    if (wasCapturing)
-                    {
-                        pieceCaptured.AddPieceAt (to);
-                    } if (wasCastling)
-                    {
-                        rooksCastled.RemovePieceAt (rookCastleSquare);
-                        rooksCastled.AddPieceAt (rookCastleSquareFrom);
-                    } if (wasPromotion)
-                    {
-                        queensPromotedTo.RemovePieceAt (to);
-                        pawnsPromotedFrom.AddPieceAt (from);
-                    }
-
-                    board.whiteMove = whiteMove;
-                    board.castlingRights = castlingRights;
-
-                    board.legalMoves = legalMoves;
-                    #endregion
-                    
-                    if (score >= beta)
-                        return beta;
-                    if (score > alpha)
-                        alpha = score;
-
-                    moves &= moves - 1;
+                    pieceCaptured.AddPieceAt (to);
+                } if (wasCastling)
+                {
+                    rooksCastled.RemovePieceAt (rookCastleSquare);
+                    rooksCastled.AddPieceAt (rookCastleSquareFrom);
+                } if (wasPromotion)
+                {
+                    queensPromotedTo.RemovePieceAt (to);
+                    pawnsPromotedFrom.AddPieceAt (from);
                 }
 
-                friendlyCharacters &= friendlyCharacters - 1;
+                board.whiteMove = whiteMove;
+                board.castlingRights = castlingRights;
+
+                board.legalMoves = legalMoves;
+                #endregion
+                
+                if (score >= beta)
+                    return beta;
+                if (score > alpha)
+                    alpha = score;
             }
 
             return alpha;
@@ -331,19 +325,56 @@ namespace QuickChess
             output.RegenerateLegalMoves ();
         }
 
-
-
-        public void GetBestMove ()
+        public void BestMoveWithSearch ()
         {
+            stopwatch = new System.Diagnostics.Stopwatch ();
+            stopwatch.Start ();
+
             nodesEvaluated = 0;
             checkmatesFound = 0;
+            nodesCutoff = 0;
 
             // This is the Ai's function that decides move to make
             CopyBoard (gm.board, ref board);
 
             white = gm.board.whiteMove;
-            Depth = 5;
-            Search (5, float.MinValue, float.MaxValue);
+            Search (Depth, float.MinValue, float.MaxValue);
+
+            Debug.Log ($"Search was {stopwatch.ElapsedMilliseconds}ms long.");
+
+            foundBestMove = true;
+        }
+
+        public void GetBestMove ()
+        {
+            if (!useOpeningBook)
+            {
+                BestMoveWithSearch ();
+                return;
+            }
+
+            string fen = (gm.board.GetFen ());
+            string replacedFen = fen.Replace("/", "");
+            
+            try {
+                List<ToFrom> allMoves = ParseOpeningBook.Book.book[replacedFen];
+                var rnd = new System.Random ();
+
+                bool foundLegalMove = false;
+
+                while (!foundLegalMove) {
+                    CopyBoard (gm.board, ref board);
+
+                    ToFrom resultingMove = allMoves[rnd.Next (0, allMoves.Count)];
+                    this.From = resultingMove.from;
+                    this.To = resultingMove.to;
+                    foundLegalMove = board.Push (this.From, this.To);
+                }
+                
+            } catch (System.Exception err)
+            {
+                BestMoveWithSearch ();
+            }
 
             foundBestMove = true;
         }

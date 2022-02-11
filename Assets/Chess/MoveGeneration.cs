@@ -250,7 +250,7 @@ namespace QuickChess
 
         private List<Move> formattedMoves;
 
-        public List<Move> FormatLegalMoves ()
+        public List<Move> FormatLegalMoves (bool onlyCaptures = false)
         {
             UInt64 whiteBinary = board.white.GetCombinedBinary();
             UInt64 blackBinary = board.black.GetCombinedBinary();
@@ -279,7 +279,8 @@ namespace QuickChess
                     currentMove.pieceType = pieceMap[from];
                     currentMove.pieceCapturing = pieceMap[to];
 
-                    formattedMoves.Add (currentMove);
+                    if (!(onlyCaptures && !currentMove.isCapture))
+                        formattedMoves.Add (currentMove);
 
                     allMoves &= allMoves - 1;
                 }

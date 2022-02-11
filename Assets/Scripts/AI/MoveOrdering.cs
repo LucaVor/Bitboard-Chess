@@ -14,15 +14,16 @@ namespace QuickChess
             return a.from == b.from && a.to == b.to;
         }
 
-        public static void OrderMoves (Board board, List<Move> moves, bool useID = false)
-        {
+        public static void OrderMoves (Board board, List<Move> moves, bool captureExp = false)
+        {            
             for (int i = 0; i < moves.Count; i ++)
             {
                 int eval = 0;
 
                 if (moves[i].isCapture)
                 {
-                    eval += 10 * Move.PieceValues[moves[i].pieceCapturing] - Move.PieceValues[moves[i].pieceType];
+                    int mul = captureExp ? 5 : 1;
+                    eval += 10 * (Move.PieceValues[moves[i].pieceCapturing] * mul) - (Move.PieceValues[moves[i].pieceType] * mul);
                     eval += 1000;
                 }
 
@@ -32,12 +33,6 @@ namespace QuickChess
                 }
 
                 eval += Move.PieceValues[moves[i].pieceType] * 2;
-
-                if (MoveEquals (bestMove, moves[i]) && useID)
-                {
-                    Debug.Log ("Looking at best move for previous depth iteration.");
-                    eval += 100000;
-                }
 
                 moveEvals[i] = eval;
             }

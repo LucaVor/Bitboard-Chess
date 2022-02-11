@@ -69,7 +69,7 @@ namespace QuickChess
             -5,  0,  0,  0,  0,  0,  0, -5,
             -5,  0,  0,  0,  0,  0,  0, -5,
             -5,  0,  0,  0,  0,  0,  0, -5,
-            0,  0,  0,  5,  5,  0,  0,  0
+            0,  0,  0,  5,  5,  20,  0,  0
         };
 
         public static float[] whiteKingEndPieceSquareTable = new float[] {
@@ -177,7 +177,7 @@ namespace QuickChess
         }
 
         public float[] multipliers = new float[] {
-            10f, 2, 1.5f, 1, 0.04f, 3.5f, 3
+            13f, 2, 1.5f, 1, 0.04f, 3.5f, 3
         };
 
         public float whiteEndgame = 0;

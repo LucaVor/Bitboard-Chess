@@ -1530,7 +1530,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -4.399994, y: -62.759995}
+  m_AnchoredPosition: {x: -4.4000244, y: -62.76001}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1819943405
@@ -1585,6 +1585,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1926672683}
   - component: {fileID: 1926672682}
+  - component: {fileID: 1926672684}
   m_Layer: 0
   m_Name: Ai
   m_TagString: Untagged
@@ -1605,12 +1606,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gm: {fileID: 0}
-  Depth: 6
+  Depth: 5
   MaxQuienceDepth: 4
   allocatedMilliseconds: 15000
   white: 0
+  useOpeningBook: 1
   nodesEvaluated: 0
   checkmatesFound: 0
+  nodesCutoff: 0
   moveCountText: {fileID: 1819943405}
   cancelledSearch: 0
 --- !u!4 &1926672683
@@ -1627,6 +1630,36 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 7
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1926672684
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926672681}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c664724c2bfd864da34de5f8357a66c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  openingPly: 30
+  openingBookTXT: {fileID: 4900000, guid: 405a2c238cb698e42aa2c288c0f4d5d0, type: 3}
+  parseBook: 0
+  loadBookFromFile: 1
+  outputFilepath: C:\Users\lbvor\Bitboard Chess\Assets\Scripts\AI\OpeningBookBytes.txt
+  iteration: 0
+  fenToTest: 
+  searchHistory: 0
+  CacheToMemory: 0
+  files:
+  - a
+  - b
+  - c
+  - d
+  - e
+  - f
+  - g
+  - h
 --- !u!1 &4379053777535824428
 GameObject:
   m_ObjectHideFlags: 0
