@@ -30,6 +30,17 @@ namespace QuickChess
         public static UInt64[] precomputedKingMoves;
         public static UInt64[] precomputedBlackKingCastling;
         public static UInt64[] precomputedWhiteKingCastling;
+        public static UInt64[] precomputedWhitePawnEnPassantAttacks;
+        public static UInt64[] precomputedBlackPawnEnPassantAttacks;
+
+        public const UInt64 EnPassantFileA = (1UL << 16) | (1UL << 40);
+        public const UInt64 EnPassantFileB = (1UL << 17) | (1UL << 41);
+        public const UInt64 EnPassantFileC = (1UL << 18) | (1UL << 42);
+        public const UInt64 EnPassantFileD = (1UL << 19) | (1UL << 43);
+        public const UInt64 EnPassantFileE = (1UL << 20) | (1UL << 44);
+        public const UInt64 EnPassantFileF = (1UL << 21) | (1UL << 45);
+        public const UInt64 EnPassantFileG = (1UL << 22) | (1UL << 46);
+        public const UInt64 EnPassantFileH = (1UL << 23) | (1UL << 47);
 
         public const int whiteKingSquare = 4;
         public const int blackKingSquare = 60;
@@ -99,6 +110,18 @@ namespace QuickChess
             precomputedKingMoves = new UInt64[64];
             precomputedBlackKingCastling = new UInt64[64];
             precomputedWhiteKingCastling = new UInt64[64];
+            precomputedWhitePawnEnPassantAttacks = new UInt64[64];
+            precomputedBlackPawnEnPassantAttacks = new UInt64[64];
+
+            UnityEngine.Debug.Log (DebugC.StringToIndex ("a3") + " : " + DebugC.StringToIndex ("a6"));
+            UnityEngine.Debug.Log (DebugC.StringToIndex ("b3") + " : " + DebugC.StringToIndex ("b6"));
+            UnityEngine.Debug.Log (DebugC.StringToIndex ("c3") + " : " + DebugC.StringToIndex ("c6"));
+            UnityEngine.Debug.Log (DebugC.StringToIndex ("d3") + " : " + DebugC.StringToIndex ("d6"));
+            UnityEngine.Debug.Log (DebugC.StringToIndex ("e3") + " : " + DebugC.StringToIndex ("e6"));
+            UnityEngine.Debug.Log (DebugC.StringToIndex ("f3") + " : " + DebugC.StringToIndex ("f6"));
+            UnityEngine.Debug.Log (DebugC.StringToIndex ("g3") + " : " + DebugC.StringToIndex ("g6"));
+            UnityEngine.Debug.Log (DebugC.StringToIndex ("h3") + " : " + DebugC.StringToIndex ("h6"));
+            
 
             UInt64 One = (UInt64) 1;
 
@@ -327,6 +350,22 @@ namespace QuickChess
                     precomputedWhiteKingCastling[i] = whiteCastlingValue;
                     precomputedBlackKingCastling[i] = blackCastlingValue;
                     #endregion
+                
+                    #region En Passant
+                    UInt64 whitePawnEnPassant = 0UL;
+                    UInt64 blackPawnEnPassant = 0UL;
+
+                    if (y == 4) { /* Where the white pawn can en passant on  */
+                        if (x < 7) whitePawnEnPassant |= (1UL << (i + UP + RIGHT));
+                        if (x > 0) whitePawnEnPassant |= (1UL << (i + UP + LEFT));
+                    } if (y == 3) {
+                        if (x < 7) blackPawnEnPassant |= (1UL << (i + DOWN + RIGHT));
+                        if (x > 0) blackPawnEnPassant |= (1UL << (i + DOWN + LEFT));
+                    }
+
+                    precomputedWhitePawnEnPassantAttacks[i] = whitePawnEnPassant;
+                    precomputedBlackPawnEnPassantAttacks[i] = blackPawnEnPassant;
+                    #endregion                
                 }
             }
         }

@@ -117,7 +117,7 @@ namespace QuickChess
 
                 bool breakOutOfLine = false;
 
-                for (int i = 0; i < strMoves.Length; i ++)
+                for (int i = 0; i < Mathf.Min(openingPly, strMoves.Length); i ++)
                 {
                     string san = (strMoves[i]).Replace ("+", "").Replace ("$", "").Replace ("x", "").Replace ("-", "");
 

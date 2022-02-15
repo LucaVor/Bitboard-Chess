@@ -63,6 +63,15 @@ if check
     exclude all moves that aren't checkSquare or in betweenHash
 }
 
+En Passant
+
+have white & black white passant attacks in preprocessing
+have UInt64 for each file for white and black consisting of 3rd and 6th rank.
+
+set ^ based on previous move if it was a pawn move up 2
+
+get attacks and mask it by UInt64
+
 ______________
 */
 
@@ -516,7 +525,8 @@ namespace QuickChess
         {
             UInt64 moves = (colour == PieceBinary.White) ? PreProcessing.precomputedWhitePawnMoves[square] : PreProcessing.precomputedBlackPawnMoves[square];
             UInt64 attacks = (colour == PieceBinary.White) ? PreProcessing.precomputedWhitePawnAttacks[square] : PreProcessing.precomputedBlackPawnAttacks[square];
-            
+            UInt64 enPassantMoves = (colour == PieceBinary.White) ? PreProcessing.precomputedWhitePawnEnPassantAttacks[square] : PreProcessing.precomputedBlackPawnEnPassantAttacks[square];
+
             if (useKingMask == EXCLUDE_KING) {
                 pawnAttackedMoves |= attacks;
                 return attacks;
@@ -526,6 +536,7 @@ namespace QuickChess
             
             attacks &= enemy;
             moves &= ~(friend | enemy);
+            moves |= (enPassantMoves & board.enPassantFile);
 
             int offset = colour == PieceBinary.White ? 16 : -16;
             if (

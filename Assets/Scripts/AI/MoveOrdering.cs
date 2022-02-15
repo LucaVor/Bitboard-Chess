@@ -6,24 +6,25 @@ namespace QuickChess
 {
     public class MoveOrdering : MonoBehaviour
     {
-        public static int[] moveEvals = new int[218]; /* 218 is the maximum amount of legal moves in chess */
+        public static float[] moveEvals = new float[218]; /* 218 is the maximum amount of legal moves in chess */
         public static Move bestMove = new Move(); /* For iterative deepening */
+
+        private static Dictionary<Move, float> evaluations;
 
         public static bool MoveEquals (Move a, Move b)
         {
             return a.from == b.from && a.to == b.to;
         }
 
-        public static void OrderMoves (Board board, List<Move> moves, bool captureExp = false)
+        public static void OrderMoves (Board board, List<Move> moves, bool useEV = false)
         {            
             for (int i = 0; i < moves.Count; i ++)
             {
-                int eval = 0;
+                float eval = 0;
 
                 if (moves[i].isCapture)
                 {
-                    int mul = captureExp ? 5 : 1;
-                    eval += 10 * (Move.PieceValues[moves[i].pieceCapturing] * mul) - (Move.PieceValues[moves[i].pieceType] * mul);
+                    eval += 10 * (Move.PieceValues[moves[i].pieceCapturing]) - (Move.PieceValues[moves[i].pieceType]);
                     eval += 1000;
                 }
 
@@ -33,6 +34,11 @@ namespace QuickChess
                 }
 
                 eval += Move.PieceValues[moves[i].pieceType] * 2;
+
+                if (useEV)
+                {
+                    eval = SearchForMove (moves[i]);
+                }
 
                 moveEvals[i] = eval;
             }
@@ -46,6 +52,43 @@ namespace QuickChess
 					}
 				}
 			}
+        }
+
+        public static float SearchForMove (Move m)
+        {
+            foreach (KeyValuePair<Move, float> entry in evaluations)
+            {
+                if (Equals (m, entry.Key))
+                {
+                    return entry.Value;
+                }
+            }
+
+            Debug.Log ("Did not find move.");
+            return 0;
+        }
+
+        public static bool Equals (Move a, Move b)
+        {
+            return a.from == b.from && a.to == b.to;
+        }
+
+        public static void SetMoveEvaluations (Dictionary<Move, float> expos)
+        {
+            evaluations = new Dictionary<Move, float> (expos);
+        }
+    }
+
+    public class MoveEqualityComparer : IEqualityComparer<Move>
+    {
+        public bool Equals (Move a, Move b)
+        {
+            return a.from == b.from && a.to == b.to;
+        }
+
+        public int GetHashCode (Move move)
+        {
+            return move.GetHashCode ();
         }
     }
 }

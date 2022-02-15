@@ -12,7 +12,6 @@ namespace QuickChess
         public GameManager gm;
         public int Depth = 4;
         public int MaxQuienceDepth = 5;
-        public float allocatedMilliseconds = 6000;
         public static Ai ai;
         public static Thread thread;
 
@@ -24,6 +23,9 @@ namespace QuickChess
         public int nodesEvaluated = 0;
         public int checkmatesFound = 0;
         public int nodesCutoff = 0;
+
+        public int millisecondLimit = 5000;
+        public bool inSearch = false;
 
         public System.Diagnostics.Stopwatch stopwatch;
         public UnityEngine.UI.Text moveCountText;
@@ -38,25 +40,29 @@ namespace QuickChess
             gm = GameManager.instance;
             evaluator = new Evaluate ();
 
+            millisecondLimit = SceneManagement.DEPTH;
+
             // Depth = SceneManagement.DEPTH;
         }
 
         public bool IsMateScore (float score)
         {
-            const int mateScore = 100000;
+            const int mateScore = 1000000;
             return Mathf.Abs (score) >= (mateScore - Depth);
         }
 
         public bool cancelledSearch = false;
+        public Dictionary<Move, float> superficialEvaluations;
 
-        public float Search (int depth, float alpha, float beta)
+        public float Search (int depth, float alpha, float beta, bool max)
         {
-            // if (stopwatch.ElapsedMilliseconds > allocatedMilliseconds) {
-            //     cancelledSearch = true;
-            //     return 0;
-            // }
+            if (abortSearch)
+            {
+                abortedSearch = true;
+                return 0;
+            }
 
-            const int mateScore = 100000;
+            const int mateScore = 1000000;
 
             if (depth != Depth)
             {
@@ -69,8 +75,12 @@ namespace QuickChess
 
             if (depth == 0)
             {
-                float eval = ((SceneManagement.boolQuiesence) ? (Quiesce (0, alpha, beta)) : (evaluator.Eval (board)));
-                // float eval = evaluator.Eval (board);
+                // float eval = ((SceneManagement.boolQuiesence) ? (Quiesce (0, alpha, beta)) : (evaluator.Eval (board)));
+                float eval = evaluator.Eval (board);
+                if (!max)
+                {
+                    eval *= -1;
+                }
 
                 return eval;
             }
@@ -80,7 +90,7 @@ namespace QuickChess
                 checkmatesFound++;
                 board.moveGenerator.GenerateMoves ();
 
-                if (board.moveGenerator.inCheck)
+                if (board.inCheck)
                 {
                     float score = mateScore - (Depth - depth);
                     return -score;
@@ -91,7 +101,7 @@ namespace QuickChess
 
             UInt64[] legalMoves = board.legalMoves;
             List<Move> formattedMoves = board.moveGenerator.FormatLegalMoves ();
-            MoveOrdering.OrderMoves (board, formattedMoves);
+            MoveOrdering.OrderMoves (board, formattedMoves, (depth == Depth) && (depth > 1));
 
             int castlingRights = board.castlingRights;
             bool whiteMove = board.whiteMove;
@@ -110,6 +120,7 @@ namespace QuickChess
                 bool wasPromotion = board.wasPromotion;
                 bool wasCheck = board.inCheck;
                 bool wasCheckmate = board.inCheckmate;
+                bool wasEnPassant = board.wasEnPassant;
 
                 Pieces pawnsPromotedFrom = board.pawnsPromotedFrom;
                 Pieces queensPromotedTo = board.queensPromotedTo;
@@ -117,9 +128,12 @@ namespace QuickChess
                 Pieces rooksCastled = board.rooksCastled;
                 int rookCastleSquare = board.latestRookCastleSqr;
                 int rookCastleSquareFrom = board.latestRookCastleSqrFrom;
+                int enPassantPieceCaptured = board.latestEnPassantPawnCaptured;
+                UInt64 enPassantFile = board.enPassantFile;
                 #endregion
 
-                float eval = -Search (depth - 1, -beta, -alpha);
+                float eval = -Search (depth - 1, -beta, -alpha, !max);
+                superficialEvaluations.Add (move, eval);
 
                 board.inCheck = wasCheck;
                 board.inCheckmate = wasCheckmate;
@@ -127,13 +141,16 @@ namespace QuickChess
                 #region Undo Move
                 if (!wasPromotion)
                 {
-                    /* Fix error here: then add opening book: then make a system to train AI multipliers (Make it play against stockfish) */
                     board.ForcePush (to, from);
                 }
 
                 if (wasCapturing)
                 {
-                    pieceCaptured.AddPieceAt (to);
+                    if (!wasEnPassant)
+                        pieceCaptured.AddPieceAt (to);
+                    else
+                        pieceCaptured.AddPieceAt (enPassantPieceCaptured);
+
                 } if (wasCastling)
                 {
                     rooksCastled.RemovePieceAt (rookCastleSquare);
@@ -146,6 +163,7 @@ namespace QuickChess
 
                 board.whiteMove = whiteMove;
                 board.castlingRights = castlingRights;
+                board.enPassantFile = enPassantFile;
 
                 board.legalMoves = legalMoves;
                 #endregion
@@ -171,119 +189,23 @@ namespace QuickChess
             return alpha;
         }
 
-        public float Quiesce (int depth, float alpha, float beta)
-        {
-            // if (stopwatch.ElapsedMilliseconds > allocatedMilliseconds) {
-            //     cancelledSearch = true;
-            //     return 0;
-            // }
-
-            const int mateScore = 100000;
-
-            if (board.inCheckmate)
-            {
-                board.moveGenerator.GenerateMoves ();
-
-                if (board.moveGenerator.inCheck)
-                {
-                    float score = mateScore - (Depth - depth);
-                    return -score;
-                } else {
-                    return 0;
-                }
-            }
-
-            nodesEvaluated ++;
-            float evaluation = evaluator.Eval (board);
-
-            if (evaluation >= beta)
-                return beta;
-            if (evaluation > alpha)
-                alpha = evaluation;
-
-            // if (depth == 0)
-            // {
-            //     return alpha;
-            // }
-
-            UInt64[] legalMoves = board.moveGenerator.GenerateMoves ();
-            List<Move> allMoves = board.moveGenerator.FormatLegalMoves (true);
-            MoveOrdering.OrderMoves (board, allMoves, true);
-
-            UInt64 friendlyCharacters = board.whiteMove ? board.white.GetCombinedBinary() : board.black.GetCombinedBinary();
-            UInt64 enemyCharacters = board.whiteMove ? board.black.GetCombinedBinary() : board.white.GetCombinedBinary ();
-
-            int castlingRights = board.castlingRights;
-            bool whiteMove = board.whiteMove;
-
-            foreach (Move move in allMoves)
-            {
-                int to = move.to;
-                int from = move.from;
-
-                // Move board
-                bool errorCode = board.Push (from, to);
-
-                #region Save Data
-                bool wasCapturing = board.wasCapturingMove;
-                bool wasCastling = board.wasCastlingMove;
-                bool wasPromotion = board.wasPromotion;
-                bool wasCheck = board.inCheck;
-                bool wasCheckmate = board.inCheckmate;
-
-                Pieces pawnsPromotedFrom = board.pawnsPromotedFrom;
-                Pieces queensPromotedTo = board.queensPromotedTo;
-                Pieces pieceCaptured = board.latestPieceCaptured;
-                Pieces rooksCastled = board.rooksCastled;
-                int rookCastleSquare = board.latestRookCastleSqr;
-                int rookCastleSquareFrom = board.latestRookCastleSqrFrom;
-                #endregion
-
-                float score = -Quiesce (depth - 1, -beta, -alpha);
-
-                board.inCheck = wasCheck;
-                board.inCheckmate = wasCheckmate;
-
-                #region Undo Move
-                if (!wasPromotion)
-                    board.ForcePush (to, from);
-
-                if (wasCapturing)
-                {
-                    pieceCaptured.AddPieceAt (to);
-                } if (wasCastling)
-                {
-                    rooksCastled.RemovePieceAt (rookCastleSquare);
-                    rooksCastled.AddPieceAt (rookCastleSquareFrom);
-                } if (wasPromotion)
-                {
-                    queensPromotedTo.RemovePieceAt (to);
-                    pawnsPromotedFrom.AddPieceAt (from);
-                }
-
-                board.whiteMove = whiteMove;
-                board.castlingRights = castlingRights;
-
-                board.legalMoves = legalMoves;
-                #endregion
-                
-                if (score >= beta)
-                    return beta;
-                if (score > alpha)
-                    alpha = score;
-            }
-
-            return alpha;
-        }
-
         bool foundBestMove = false;
         int From = -1;
         int To = -1;
         int movesEvaled = 0;
+        int currentDepth = 0;
 
         public void Update()
         {
-            moveCountText.text = nodesEvaluated.ToString();
+            moveCountText.text = currentDepth.ToString ();
+
+            if (inSearch){
+                if (stopwatch.ElapsedMilliseconds > millisecondLimit && currentDepth > 5)
+                {
+                    abortSearch = true;
+                    inSearch = false;
+                }
+            }
             if (foundBestMove)
             {
                 try { Debug.Log ($"Making AI Move. {DebugC.IndexToString (From)} {DebugC.IndexToString (To)}"); }
@@ -307,7 +229,7 @@ namespace QuickChess
             // GetBestMove ();
         }
 
-        public void CopyBoard (Board template, ref Board output)
+        public static void CopyBoard (Board template, ref Board output)
         {
             int castlingRights = template.castlingRights;
             bool whiteMove = template.whiteMove;
@@ -325,11 +247,8 @@ namespace QuickChess
             output.RegenerateLegalMoves ();
         }
 
-        public void BestMoveWithSearch ()
+        public float SearchWithDepth (int depth)
         {
-            stopwatch = new System.Diagnostics.Stopwatch ();
-            stopwatch.Start ();
-
             nodesEvaluated = 0;
             checkmatesFound = 0;
             nodesCutoff = 0;
@@ -338,15 +257,75 @@ namespace QuickChess
             CopyBoard (gm.board, ref board);
 
             white = gm.board.whiteMove;
-            Search (Depth, float.MinValue, float.MaxValue);
+            Depth = depth;
+            return Search (depth, float.MinValue, float.MaxValue, white);
+        }
+
+        public bool abortedSearch = false;
+        public bool abortSearch = false;
+
+        public void BestMoveWithSearch ()
+        {
+            stopwatch = new System.Diagnostics.Stopwatch ();
+            stopwatch.Start ();
+
+            inSearch = true;
+
+            const int MaximumDepth = 20;
+
+            abortedSearch = false;
+            abortSearch = false;
+
+            ToFrom previousBest = new ToFrom ();
+            superficialEvaluations = new Dictionary<Move, float> ();
+
+            for (int i = 1; i <= MaximumDepth; i += 1)
+            {
+                /*
+                    LUCA, don't delete this message until it is done.
+                    You must make it so that you can exclude specfic
+                    moves from fen in ParseOpeningBook, reparse, and recache.
+                */
+
+                currentDepth = i;
+                float best = SearchWithDepth (i);
+                MoveOrdering.SetMoveEvaluations (superficialEvaluations);
+                superficialEvaluations = new Dictionary<Move, float> ();
+
+                if (abortedSearch)
+                {
+                    this.To = previousBest.to;
+                    this.From = previousBest.from;
+                    foundBestMove = true;
+                    Debug.Log ($"Aborted at depth {i}, returning {DebugC.IndexToString (this.From)}, {DebugC.IndexToString (this.To)}");
+                    return;
+                } else {
+                    previousBest.to = this.To;
+                    previousBest.from = this.From;
+                    foundBestMove = false;
+
+                    if (IsMateScore (best))
+                    {
+                        foundBestMove = true;
+                        return;
+                    }
+
+                    Debug.Log ($"Searched at depth {i}, searching at higher depth. ({DebugC.IndexToString (this.From)}, {DebugC.IndexToString (this.To)})");
+                }
+            }
 
             Debug.Log ($"Search was {stopwatch.ElapsedMilliseconds}ms long.");
-
-            foundBestMove = true;
         }
 
         public void GetBestMove ()
         {
+            ToFrom stockFishBest = GameManager.instance.GetBestMoveStockfish ();
+            this.From = stockFishBest.from;
+            this.To = stockFishBest.to;
+            foundBestMove = true;
+
+            return;
+            
             if (!useOpeningBook)
             {
                 BestMoveWithSearch ();
@@ -370,13 +349,12 @@ namespace QuickChess
                     this.To = resultingMove.to;
                     foundLegalMove = board.Push (this.From, this.To);
                 }
-                
+
+                foundBestMove = true;
             } catch (System.Exception err)
             {
                 BestMoveWithSearch ();
             }
-
-            foundBestMove = true;
         }
 
         public int[] GetOnes (UInt64 binary)

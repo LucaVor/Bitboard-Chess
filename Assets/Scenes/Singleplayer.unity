@@ -398,6 +398,7 @@ MonoBehaviour:
   blackYRotation: 180.69
   checkmateUI: {fileID: 1732043272}
   multiplayer: 0
+  playEntireGame: 1
   whitePlayer: 1
   audioSource: {fileID: 519420035}
   ashersAudioSource: {fileID: 519420034}
@@ -408,6 +409,7 @@ MonoBehaviour:
   gameStart: {fileID: 8300000, guid: 370228d3ae195994ca7e5d18413c8d3d, type: 3}
   ashersMusic: {fileID: 8300000, guid: b98a31daf23f8854288820ff64a0622b, type: 3}
   evaluationText: {fileID: 885316043}
+  checkmateText: {fileID: 1732043274}
   fen: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
   setCastlingRights: 0
   canWhiteCastle: 0
@@ -418,8 +420,10 @@ MonoBehaviour:
   canBlackCastleQueen: 0
   startOnWhiteMove: 1
   useAI: 1
+  playsForBoth: 0
   search: 0
   depth: 0
+  stockfishExePath: C:\Users\lbvor\OneDrive\Documents\Desktop\stockfish_14.1_win_x64_avx2\stockfish_14.1_win_x64_avx2.exe
 --- !u!20 &519420031
 Camera:
   m_ObjectHideFlags: 0
@@ -1054,7 +1058,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
-  m_Color: {r: 0, g: 0.6415094, b: 0.47854555, a: 0.5882353}
+  m_Color: {r: 0.50296193, g: 0, b: 0.6431373, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 1
@@ -1073,7 +1077,7 @@ Transform:
   m_GameObject: {fileID: 841293204}
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 2.5, y: 2.5, z: 2.5}
+  m_LocalScale: {x: 3, y: 3, z: 3}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 3
@@ -1608,14 +1612,17 @@ MonoBehaviour:
   gm: {fileID: 0}
   Depth: 5
   MaxQuienceDepth: 4
-  allocatedMilliseconds: 15000
   white: 0
   useOpeningBook: 1
   nodesEvaluated: 0
   checkmatesFound: 0
   nodesCutoff: 0
+  millisecondLimit: 20000
+  inSearch: 0
   moveCountText: {fileID: 1819943405}
   cancelledSearch: 0
+  abortedSearch: 0
+  abortSearch: 0
 --- !u!4 &1926672683
 Transform:
   m_ObjectHideFlags: 0
@@ -1642,7 +1649,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0c664724c2bfd864da34de5f8357a66c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  openingPly: 30
+  openingPly: 14
   openingBookTXT: {fileID: 4900000, guid: 405a2c238cb698e42aa2c288c0f4d5d0, type: 3}
   parseBook: 0
   loadBookFromFile: 1

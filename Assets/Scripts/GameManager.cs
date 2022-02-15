@@ -62,6 +62,7 @@ namespace QuickChess
         public GameObject checkmateUI;
 
         public bool multiplayer = true;
+        public bool playEntireGame = true;
 
         public bool whitePlayer;
         public UnityEngine.AudioSource audioSource;
@@ -75,6 +76,7 @@ namespace QuickChess
 
         public Evaluate Evaluator;
         public UnityEngine.UI.Text evaluationText;
+        public UnityEngine.UI.Text checkmateText;
 
         public string fen = "8/4PKb1/8/4pk2/8/8/8/8";
         public bool setCastlingRights;
@@ -86,6 +88,7 @@ namespace QuickChess
         public bool canBlackCastleQueen;
         public bool startOnWhiteMove = true;
         public bool useAI = true;
+        public bool playsForBoth = false;
 
         void Awake()
         {
@@ -154,6 +157,7 @@ namespace QuickChess
             board.onCastleCallback = OnCastle;
             board.onPromotionCallback = OnPromotion;
             board.onCheckmateCallback = OnCheckmate;
+            board.onEnPassantCallback = OnEnPassant;
 
             Evaluator = new Evaluate();
             evaluationText.text = Evaluator.Eval (board).ToString ();
@@ -196,14 +200,17 @@ namespace QuickChess
 
         void Start()
         {
+            InitStockfish ();
+
             if (!multiplayer)
             {
                 Init (
                     // (UnityEngine.Random.Range(0,100)<50)?false:true
-                    true
+                    // true
+                    SceneManagement.playAsWhite
                 );
 
-                if (!whitePlayer && useAI)
+                if (!whitePlayer && useAI && !playsForBoth)
                 {
                     Ai.ai.AI();
                 }
@@ -266,10 +273,10 @@ namespace QuickChess
                 UInt64 whiteBinary = board.white.GetCombinedBinary();
                 UInt64 blackBinary = board.black.GetCombinedBinary();
                 bool show = true;
-                if ((whiteBinary & (1UL << from)) != 0 && !whitePlayer)
+                if ((whiteBinary & (1UL << from)) != 0 && !whitePlayer && !playsForBoth)
                 {
                     show = false;
-                } if ((blackBinary & (1UL << from)) != 0 && whitePlayer)
+                } if ((blackBinary & (1UL << from)) != 0 && whitePlayer && !playsForBoth)
                 {
                     show = false;
                 }
@@ -304,6 +311,12 @@ namespace QuickChess
             pieceMap[f] = null;
         }
 
+        void OnEnPassant (int pawnCaptured)
+        {
+            Destroy (pieceMap[pawnCaptured].gameObject);
+            pieceMap[pawnCaptured] = null;
+        }
+
         void OnPromotion (int from, int at, bool isWhiteP)
         {
             GamePiece pieceToChange = pieceMap[from];
@@ -328,10 +341,10 @@ namespace QuickChess
                 UInt64 whiteBinary = board.white.GetCombinedBinary();
                 UInt64 blackBinary = board.black.GetCombinedBinary();
                 
-                if ((whiteBinary & (1UL << from)) != 0 && !whitePlayer && !fromAi)
+                if ((whiteBinary & (1UL << from)) != 0 && !whitePlayer && !fromAi && !playsForBoth)
                 {
                     return;
-                } if ((blackBinary & (1UL << from)) != 0 && whitePlayer && !fromAi)
+                } if ((blackBinary & (1UL << from)) != 0 && whitePlayer && !fromAi && !playsForBoth)
                 {
                     return;
                 }
@@ -369,17 +382,32 @@ namespace QuickChess
             else
                 GameManager.Play (SoundEffects.Check);
 
-            if (!multiplayer && !fromAi && useAI) {
+            if ((!multiplayer && !fromAi && useAI && !playsForBoth)) {
                 Debug.Log ("Ai! Your turn.");
+                // System.Threading.Thread thrd = new System.Threading.Thread ( GetBestMoveStockfish );
+                // thrd.Start();
                 Ai.ai.AI();
             }
 
             evaluationText.text = Evaluator.Eval (board).ToString();
         }
 
+        public void OnDrawByRep ()
+        {
+            GameManager.Play (SoundEffects.Checkmate);
+            checkmateText.text = "Draw By Rep!";
+            checkmateUI.SetActive (true);
+        }
+
         public void OnCheckmate()
         {
             GameManager.Play (SoundEffects.Checkmate);
+            
+            if (!board.moveGenerator.inCheck)
+            {
+                checkmateText.text = "Stalemate!";
+            }
+
             checkmateUI.SetActive (true);
         }
 
@@ -439,6 +467,50 @@ namespace QuickChess
                     currentPiece ++;
                 }
             }
+        }
+
+        public string stockfishExePath;
+        public System.Diagnostics.Process stockfish;
+
+        public void InitStockfish ()
+        {
+            stockfish = new System.Diagnostics.Process ();
+            stockfish.StartInfo.FileName = stockfishExePath;
+            stockfish.StartInfo.UseShellExecute = false;
+            stockfish.StartInfo.RedirectStandardInput = true;
+            stockfish.StartInfo.RedirectStandardOutput = true;
+            stockfish.Start();
+        }
+
+        public ToFrom GetBestMoveStockfish ()
+        {
+            string fenPass = board.GetFullFen ();
+
+            stockfish.StandardInput.WriteLine ($"position fen {fenPass}");
+            stockfish.StandardInput.WriteLine ($"go movetime 5000");
+
+            System.Threading.Thread.Sleep (5000);
+            string bestMoveLine = "";
+
+            while (true) {
+                string line = stockfish.StandardOutput.ReadLine ();
+                if (line == null || line == "") break;
+
+                if (line.Contains("bestmove"))
+                {
+                    bestMoveLine = line;
+                    break;
+                }
+            }
+
+            bestMoveLine = bestMoveLine.Split (' ')[1];
+            string fromStr = bestMoveLine.Substring (0, 2);
+            string toStr = bestMoveLine.Substring (2);
+
+            int from = DebugC.StringToIndex (fromStr);
+            int to = DebugC.StringToIndex (toStr);
+
+            return new ToFrom () { from = from, to = to};
         }
 
         public static void Play (SoundEffects sfx)

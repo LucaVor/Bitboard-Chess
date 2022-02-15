@@ -11,6 +11,7 @@ namespace QuickChess
 
         public MoveGeneration moveGenerator;
         public UInt64 One = 1;
+        public UInt64 enPassantFile = 0UL;
 
         public UInt64[] legalMoves;
 
@@ -70,11 +71,14 @@ namespace QuickChess
         public GameManagerCallbackOnPromotion onPromotionCallback = BlankOnPromotionCallback;
         public delegate void GameManagerCallbackOnCheckmate ();
         public GameManagerCallbackOnCheckmate onCheckmateCallback = BlankOnCheckmateCallback;
+        public delegate void GameManagerCallbackOnEnPassant (int pawnCaptured);
+        public GameManagerCallbackOnEnPassant onEnPassantCallback = BlankOnEnPassantCallback;
         
 
         public bool wasCastlingMove = false;
         public bool wasCapturingMove = false;
         public bool wasPromotion = false;
+        public bool wasEnPassant = false;
 
         public Pieces latestPieceCaptured = null;
         public Pieces rooksCastled = null;
@@ -82,6 +86,7 @@ namespace QuickChess
         public Pieces pawnsPromotedFrom = null;
         public int latestRookCastleSqr = -1;
         public int latestRookCastleSqrFrom = -1;
+        public int latestEnPassantPawnCaptured = -1;
 
         public string latestError = "";
         public const string IllegalMove = "Illegal Move for piece.";
@@ -92,7 +97,12 @@ namespace QuickChess
         public static void BlankOnCastleCallback (int a, int b) {}
         public static void BlankOnPromotionCallback (int a, int b, bool c) {}
         public static void BlankOnCheckmateCallback () {}
+        public static void BlankOnEnPassantCallback (int a) {}
 
+        public int forsythEnPassantSquare;
+        public int halfMoves;
+        public int fullMoves;
+        
         public bool Push (int from, int to)
         {
             // legalMoves = moveGenerator.GenerateMoves();
@@ -156,6 +166,76 @@ namespace QuickChess
 
             bool wasWhiteKingMove = (white.King.bitmap & (1UL << from)) != 0;
             bool wasBlackKingMove = (black.King.bitmap & (1UL << from)) != 0;
+
+            bool wasPawnMove = ((white.Pawns.bitmap | black.Pawns.bitmap) & (1UL << from)) != 0;
+            enPassantFile = 0UL;
+
+            int fileFrom = from % 8;
+            int fileTo = to % 8;
+
+            wasEnPassant = wasPawnMove && (fileFrom != fileTo) && !wasCapturingMove;
+
+            if (wasEnPassant)
+            {
+                if (isWhite) {
+                    black.Pawns.RemovePieceAt (to + PreProcessing.DOWN);
+                    latestPieceCaptured = black.Pawns;
+                    onEnPassantCallback (to + PreProcessing.DOWN);
+                    latestEnPassantPawnCaptured = (to + PreProcessing.DOWN);
+                } else {
+                    white.Pawns.RemovePieceAt (to + PreProcessing.UP);
+                    latestPieceCaptured = white.Pawns;
+                    onEnPassantCallback (to + PreProcessing.UP);
+                    latestEnPassantPawnCaptured = (to + PreProcessing.UP);
+                }
+
+                wasCapturingMove = true;
+            }
+
+            forsythEnPassantSquare = -1;
+
+            if (wasPawnMove)
+            {
+                int rankFrom = (int) UnityEngine.Mathf.Floor (((float) from) / 8F);
+                int rankTo = (int) UnityEngine.Mathf.Floor (((float) to) / 8F);
+
+                if (UnityEngine.Mathf.Abs (rankFrom - rankTo) == 2) { /* Was a pawn move up 2 */
+                    switch (fileFrom) {
+                        case 0:
+                            enPassantFile = PreProcessing.EnPassantFileA;
+                            forsythEnPassantSquare = whiteMove ? 16 : 40;
+                            break;
+                        case 1:
+                            enPassantFile = PreProcessing.EnPassantFileB;
+                            forsythEnPassantSquare = whiteMove ? 17 : 41;
+                            break;
+                        case 2:
+                            enPassantFile = PreProcessing.EnPassantFileC;
+                            forsythEnPassantSquare = whiteMove ? 18 : 42;
+                            break;
+                        case 3:
+                            enPassantFile = PreProcessing.EnPassantFileD;
+                            forsythEnPassantSquare = whiteMove ? 19 : 43;
+                            break;
+                        case 4:
+                            enPassantFile = PreProcessing.EnPassantFileE;
+                            forsythEnPassantSquare = whiteMove ? 20 : 44;
+                            break;
+                        case 5:
+                            enPassantFile = PreProcessing.EnPassantFileF;
+                            forsythEnPassantSquare = whiteMove ? 21 : 45;
+                            break;
+                        case 6:
+                            enPassantFile = PreProcessing.EnPassantFileG;
+                            forsythEnPassantSquare = whiteMove ? 22 : 46;
+                            break;
+                        case 7:
+                            enPassantFile = PreProcessing.EnPassantFileH;
+                            forsythEnPassantSquare = whiteMove ? 23 : 47;
+                            break;
+                    }
+                }
+            }
 
             pieceType.RemovePieceAt (from);
             pieceType.AddPieceAt (to);
@@ -249,6 +329,8 @@ namespace QuickChess
 
             if (isBlack)
             {
+                fullMoves ++;
+
                 if (pieceType == black.Pawns)
                 {
                     if (to <= 7)
@@ -266,10 +348,54 @@ namespace QuickChess
                 }
             }
 
+            halfMoves ++;
+
+            if (wasPawnMove || wasCapturingMove)
+            {
+                halfMoves = 0;
+            }
+
             whiteMove = !whiteMove;
             legalMoves = moveGenerator.GenerateMoves ();
 
             return true;
+        }
+
+        public string GetFullFen ()
+        {
+            string halfFen = GetFen () + " ";
+            
+            halfFen += whiteMove ? "w " : "b ";
+
+            string strCastlingRights = "";
+
+            if ((castlingRights & WhiteKingCastling) != 0)
+            {
+                strCastlingRights += "K";
+            } if ((castlingRights & WhiteQueenCastling) != 0)
+            {
+                strCastlingRights += "Q";
+            } if ((castlingRights & BlackKingCastling) != 0)
+            {
+                strCastlingRights += "k";
+            } if ((castlingRights & BlackQueenCastling) != 0)
+            {
+                strCastlingRights += "q";
+            }
+
+            if (strCastlingRights == "") strCastlingRights = "-";
+
+            halfFen += strCastlingRights + " ";
+
+            if (forsythEnPassantSquare != -1)
+            {
+                halfFen += DebugC.IndexToString (forsythEnPassantSquare) + " ";
+            }
+
+            halfFen += $"{halfMoves} ";
+            halfFen += $"{fullMoves} ";
+
+            return halfFen;
         }
 
         public int GetLegalMoveCount ()
@@ -482,7 +608,8 @@ namespace QuickChess
 
             char[] charArray = fen.ToCharArray();
             Array.Reverse (charArray);
-            return new string (charArray);
+            string final = new string (charArray);
+            return final.Substring (1, final.Length - 1);
         }
     }
 }

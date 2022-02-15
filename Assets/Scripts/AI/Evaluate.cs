@@ -35,7 +35,7 @@ namespace QuickChess
             -10,  5,  5, 10, 10,  5,  5,-10,
             -10,  0, 10, 10, 10, 10,  0,-10,
             -10, 10, 10, 10, 10, 10, 10,-10,
-            -10,  5,  0,  0,  0,  0,  5,-10,
+            -10,  5,  0,  5,  5,  0,  5,-10,
             -20,-10,-10,-10,-10,-10,-10,-20
         };
 
@@ -47,7 +47,7 @@ namespace QuickChess
             -5,  0,  0,  0,  0,  0,  0, -5,
             -5,  0,  0,  0,  0,  0,  0, -5,
             -5,  0,  0,  0,  0,  0,  0, -5,
-            0,  0,  0,  5,  5,  20,  0,  0
+            0,  0,  10,  5,  5,  20,  0,  0
         };
 
         public static float[] whiteQueenPieceSquareTable = new float[] {
@@ -69,7 +69,7 @@ namespace QuickChess
             -5,  0,  0,  0,  0,  0,  0, -5,
             -5,  0,  0,  0,  0,  0,  0, -5,
             -5,  0,  0,  0,  0,  0,  0, -5,
-            0,  0,  0,  5,  5,  20,  0,  0
+            0,  10,  0,  5,  5,  0,  20,  0
         };
 
         public static float[] whiteKingEndPieceSquareTable = new float[] {
@@ -176,8 +176,12 @@ namespace QuickChess
             PawnNearPromotion
         }
 
-        public float[] multipliers = new float[] {
-            13f, 2, 1.5f, 1, 0.04f, 3.5f, 3
+        public float[] multipliers_b = new float[] {
+            25f, 2, 1.5f, 1, 0.045f, 3.5f, 3
+        };
+
+        public float[] multipliers_e = new float[] {
+            25f, 3, 1, 4, 0.01f, 5, 6
         };
 
         public float whiteEndgame = 0;
@@ -375,28 +379,36 @@ namespace QuickChess
             int whiteKingSquare = board.white.King.currentPieces[0];
             int blackKingSquare = board.black.King.currentPieces[0];
 
-            white += whiteMaterial * multipliers[0];
-            black += blackMaterial * multipliers[0];
+            white += whiteMaterial * Lerp(multipliers_b[0], multipliers_e[0], whiteEndgame);
+            black += blackMaterial * Lerp(multipliers_b[0], multipliers_e[0], blackEndgame);
 
-            white += whiteBishopPair ? multipliers[1] : 0;
-            black += blackBishopPair ? multipliers[1] : 0;
+            white += whiteBishopPair ? Lerp(multipliers_b[1], multipliers_e[1], whiteEndgame) : 0;
+            black += blackBishopPair ? Lerp(multipliers_b[1], multipliers_e[1], blackEndgame) : 0;
 
-            white -= whitePawnsOnSameFile * multipliers[2];
-            black -= blackPawnsOnSameFile * multipliers[2];
+            white -= whitePawnsOnSameFile * Lerp(multipliers_b[2], multipliers_e[2], whiteEndgame);
+            black -= blackPawnsOnSameFile * Lerp(multipliers_b[2], multipliers_e[2], blackEndgame);
 
-            white += whitePassedPawns * multipliers[3] * whiteEndgame;
-            black += blackPassedPawns * multipliers[3] * blackEndgame;
+            white += whitePassedPawns * Lerp(multipliers_b[3], multipliers_e[3], whiteEndgame) * whiteEndgame;
+            black += blackPassedPawns * Lerp(multipliers_b[3], multipliers_e[3], blackEndgame) * blackEndgame;
 
-            white += whiteTranspositionValue * multipliers[4];
-            black += blackTranspositionValue * multipliers[4];
+            white += whiteTranspositionValue * Lerp(multipliers_b[4], multipliers_e[4], whiteEndgame);
+            black += blackTranspositionValue * Lerp(multipliers_b[4], multipliers_e[4], blackEndgame);
 
-            white += arrCentreManhattanDistance[blackKingSquare] * multipliers[5] * blackEndgame;
-            black += arrCentreManhattanDistance[whiteKingSquare] * multipliers[5] * whiteEndgame;
+            white += arrCentreManhattanDistance[blackKingSquare] * Lerp(multipliers_b[5], multipliers_e[5], whiteEndgame) * blackEndgame;
+            black += arrCentreManhattanDistance[whiteKingSquare] * Lerp(multipliers_b[5], multipliers_e[5], blackEndgame) * whiteEndgame;
 
-            white += whitePawnNearPromotion * multipliers[6] * whiteEndgame;
-            black += blackPawnNearPromotion * multipliers[6] * blackEndgame;
+            white += whitePawnNearPromotion * Lerp(multipliers_b[6], multipliers_e[6], whiteEndgame) * whiteEndgame;
+            black += blackPawnNearPromotion * Lerp(multipliers_b[6], multipliers_e[6], blackEndgame) * blackEndgame;
 
-            return (white - black);
+            float eval = (white - black);
+            float persp = board.whiteMove ? 1 : -1;
+
+            return eval;
+        }
+
+        public float Lerp (float a, float b, float t)
+        {
+            return a + (b - a) * t;
         }
     }
 }
